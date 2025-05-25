@@ -1,51 +1,75 @@
-import os
+import socket
+import json
 import base64
-from glob import glob
+import logging
+import os
 
-class FileInterface:
-    def __init__(self):
-        self.base_dir = 'files'
-        os.makedirs(self.base_dir, exist_ok=True)
+server_address = ('172.16.16.101', 1231)
 
-    def list(self, params=[]):
-        try:
-            filelist = glob(os.path.join(self.base_dir, '*.*'))
-            filelist = [os.path.basename(f) for f in filelist]
-            return dict(status='OK', data=filelist)
-        except Exception as e:
-            return dict(status='ERROR', data=str(e))
+def send_command(command_str=""):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(server_address)
+        command_str += "\r\n\r\n"
+        sock.sendall(command_str.encode())
 
-    def get(self, params=[]):
-        try:
-            filename = params[0]
-            if not filename:
-                return dict(status='ERROR', data='Filename kosong')
-            filepath = os.path.join(self.base_dir, filename)
-            with open(filepath, 'rb') as fp:
-                content = base64.b64encode(fp.read()).decode()
-            return dict(status='OK', data_namafile=filename, data_file=content)
-        except Exception as e:
-            return dict(status='ERROR', data=str(e))
+        data_received = ""
+        while True:
+            data = sock.recv(1024)
+            if data:
+                data_received += data.decode()
+                if "\r\n\r\n" in data_received:
+                    break
+            else:
+                break
 
-    def upload(self, params=[]):
-        try:
-            filename = params[0]
-            content_base64 = params[1].strip()
-            filepath = os.path.join(self.base_dir, filename)
-            content = base64.b64decode(content_base64)
-            with open(filepath, 'wb') as fp:
-                fp.write(content)
-            return dict(status='OK', data=f'File {filename} berhasil diupload')
-        except Exception as e:
-            return dict(status='ERROR', data=str(e))
+        return json.loads(data_received.strip())
+    except Exception as e:
+        logging.warning(f"Error: {e}")
+        return dict(status='ERROR', data=str(e))
+    finally:
+        sock.close()
 
-    def delete(self, params=[]):
-        try:
-            filename = params[0]
-            filepath = os.path.join(self.base_dir, filename)
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                return dict(status='OK', data=f'File {filename} berhasil dihapus')
-            return dict(status='ERROR', data='File tidak ditemukan')
-        except Exception as e:
-            return dict(status='ERROR', data=str(e))
+def remote_list():
+    hasil = send_command("LIST")
+    if hasil['status'] == 'OK':
+        print("Daftar file:")
+        for f in hasil['data']:
+            print(f"- {f}")
+    else:
+        print(f"Gagal: {hasil['data']}")
+
+def remote_get(filename=""):
+    hasil = send_command(f"GET {filename}")
+    if hasil['status'] == 'OK':
+        with open(hasil['data_namafile'], 'wb') as f:
+            f.write(base64.b64decode(hasil['data_file']))
+        print(f"File '{filename}' berhasil di-download.")
+    else:
+        print(f"Gagal: {hasil['data']}")
+
+def remote_upload(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            encoded = base64.b64encode(f.read()).decode()
+        filename = os.path.basename(filepath)
+        command_str = f"UPLOAD {filename}||{encoded}"
+        hasil = send_command(command_str)
+        print(hasil['data'])
+    except Exception as e:
+        print(f"Gagal upload: {str(e)}")
+
+def remote_delete(filename=""):
+    hasil = send_command(f"DELETE {filename}")
+    print(hasil['data'])
+
+if __name__ == '__main__':
+    remote_list()
+    remote_get('donalbebek.jpg')
+    remote_upload('file_upload.jpg')
+    os.remove('file_upload.jpg')
+    print("File file_upload.jpg pada local dihapus")
+    remote_list()
+    remote_get('file_upload.jpg')
+    remote_delete('file_upload.jpg')
+    remote_list()
