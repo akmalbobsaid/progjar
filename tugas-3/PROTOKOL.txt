@@ -1,1 +1,68 @@
+FILE SERVER
+TUJUAN: melayani client dalam request file server
 
+ATURAN PROTOKOL:
+- client harus mengirimkan request dalam bentuk string
+- string harus dalam format
+  REQUEST spasi PARAMETER
+- PARAMETER dapat berkembang menjadi PARAMETER1 spasi PARAMETER2 dan seterusnya
+
+REQUEST YANG DILAYANI:
+- informasi umum:
+  * Jika request tidak dikenali akan menghasilkan pesan
+    - status: ERROR
+    - data: request tidak dikenali
+  * Semua result akan diberikan dalam bentuk JSON dan diakhiri
+    dengan character ascii code #13#10#13#10 atau "\r\n\r\n"
+
+LIST
+* TUJUAN: untuk mendapatkan daftar seluruh file yang dilayani oleh file server
+* PARAMETER: tidak ada
+* RESULT:
+- BERHASIL:
+  - status: OK
+  - data: list file
+- GAGAL:
+  - status: ERROR
+  - data: pesan kesalahan
+
+GET
+* TUJUAN: untuk mendapatkan isi file dengan menyebutkan nama file dalam parameter
+* PARAMETER:
+  - PARAMETER1 : nama file
+* RESULT:
+- BERHASIL:
+  - status: OK
+  - data_namafile : nama file yang diminta
+  - data_file : isi file yang diminta (dalam bentuk base64)
+- GAGAL:
+  - status: ERROR
+  - data: pesan kesalahan
+
+UPLOAD
+* TUJUAN: untuk mengirim file dari client ke server dengan isi file dalam format base64
+* PARAMETER:
+  - PARAMETER1 dan PARAMETER2 digabung dalam satu string dengan pemisah `||`
+    - sebelum `||` adalah nama file tujuan penyimpanan di server
+    - setelah `||` adalah isi file yang sudah di-encode dalam base64 (tanpa spasi)
+* FORMAT:
+  UPLOAD nama_file.ext||isi_file_base64\r\n\r\n
+* RESULT:
+- BERHASIL:
+  - status: OK
+  - data: pesan keberhasilan upload file
+- GAGAL:
+  - status: ERROR
+  - data: pesan kesalahan (misal file tidak dapat disimpan)
+
+DELETE
+* TUJUAN: untuk menghapus file di server dengan menyebutkan nama file dalam parameter
+* PARAMETER:
+  - PARAMETER1 : nama file yang akan dihapus
+* RESULT:
+- BERHASIL:
+  - status: OK
+  - data: pesan keberhasilan penghapusan file
+- GAGAL:
+  - status: ERROR
+  - data: pesan kesalahan (misal file tidak ditemukan)
