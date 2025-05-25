@@ -19,10 +19,12 @@ class FileInterface:
 
     def get(self, params=[]):
         try:
+            if not params:
+                return dict(status='ERROR', data='Parameter nama file dibutuhkan')
             filename = params[0]
-            if filename == '':
-                return dict(status='ERROR', data='Filename kosong')
             filepath = os.path.join(self.base_dir, filename)
+            if not os.path.exists(filepath):
+                return dict(status='ERROR', data='File tidak ditemukan')
             with open(filepath, 'rb') as fp:
                 isifile = base64.b64encode(fp.read()).decode()
             return dict(status='OK', data_namafile=filename, data_file=isifile)
@@ -31,22 +33,22 @@ class FileInterface:
 
     def upload(self, params=[]):
         try:
-            combined_param = params[0]
-            if '||' not in combined_param:
-                return dict(status='ERROR', data='Format upload tidak valid')
-            filename, b64content = combined_param.split('||', 1)
-            filename = filename.strip()
-            b64content = b64content.strip()
-            filepath = os.path.join(self.base_dir, filename)
+            if len(params) < 2:
+                return dict(status='ERROR', data='Parameter upload tidak lengkap')
+            filename = params[0]
+            b64content = params[1].strip()
             content = base64.b64decode(b64content)
+            filepath = os.path.join(self.base_dir, filename)
             with open(filepath, 'wb') as fp:
                 fp.write(content)
             return dict(status='OK', data=f'File {filename} berhasil diupload')
         except Exception as e:
-            return dict(status='ERROR', data=f'Gagal upload file: {str(e)}')
+            return dict(status='ERROR', data=str(e))
 
     def delete(self, params=[]):
         try:
+            if not params:
+                return dict(status='ERROR', data='Parameter nama file dibutuhkan')
             filename = params[0]
             filepath = os.path.join(self.base_dir, filename)
             if os.path.exists(filepath):
@@ -56,13 +58,3 @@ class FileInterface:
                 return dict(status='ERROR', data='File tidak ditemukan')
         except Exception as e:
             return dict(status='ERROR', data=str(e))
-
-
-if __name__ == '__main__':
-    f = FileInterface()
-    print(f.list())
-    print(f.get(['pokijan.jpg']))
-
-    encoded = base64.b64encode(b'Hello world').decode()
-    print(f.upload(['test_upload.txt||' + encoded]))
-    print(f.delete(['test_upload.txt']))
