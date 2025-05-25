@@ -4,99 +4,72 @@ import base64
 import logging
 import os
 
-server_address = ('0.0.0.0', 7777)
+server_address = ('172.16.16.101', 1231)
 
 def send_command(command_str=""):
-    global server_address
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(server_address)
-    logging.warning(f"connecting to {server_address}")
     try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(server_address)
         command_str += "\r\n\r\n"
         sock.sendall(command_str.encode())
 
         data_received = ""
         while True:
             data = sock.recv(1024)
-            if not data:
-                break
-            data_received += data.decode()
-            if "\r\n\r\n" in data_received:
+            if data:
+                data_received += data.decode()
+                if "\r\n\r\n" in data_received:
+                    break
+            else:
                 break
 
-        hasil = json.loads(data_received.strip("\r\n\r\n"))
-        logging.warning("data received from server:")
-        return hasil
+        return json.loads(data_received.strip())
     except Exception as e:
-        logging.warning(f"error during data receiving: {e}")
-        return False
+        logging.warning(f"Error: {e}")
+        return dict(status='ERROR', data=str(e))
     finally:
         sock.close()
 
 def remote_list():
-    command_str = "LIST"
-    hasil = send_command(command_str)
-    if hasil and hasil['status'] == 'OK':
+    hasil = send_command("LIST")
+    if hasil['status'] == 'OK':
         print("Daftar file:")
-        for nmfile in hasil['data']:
-            print(f"- {nmfile}")
-        return True
+        for f in hasil['data']:
+            print(f"- {f}")
     else:
-        print("Gagal mendapatkan daftar file")
-        return False
+        print(f"Gagal: {hasil['data']}")
 
 def remote_get(filename=""):
-    command_str = f"GET {filename}"
-    hasil = send_command(command_str)
-    if hasil and hasil['status'] == 'OK':
-        namafile = hasil['data_namafile']
-        isifile = base64.b64decode(hasil['data_file'])
-        with open(namafile, 'wb') as fp:
-            fp.write(isifile)
-        print(f"File '{namafile}' berhasil di-download.")
-        return True
+    hasil = send_command(f"GET {filename}")
+    if hasil['status'] == 'OK':
+        with open(hasil['data_namafile'], 'wb') as f:
+            f.write(base64.b64decode(hasil['data_file']))
+        print(f"File '{filename}' berhasil di-download.")
     else:
-        print("Gagal mendapatkan file:", hasil.get("data", "Unknown error"))
-        return False
+        print(f"Gagal: {hasil['data']}")
 
 def remote_upload(filepath):
     try:
         with open(filepath, 'rb') as f:
             encoded = base64.b64encode(f.read()).decode()
-
         filename = os.path.basename(filepath)
         command_str = f"UPLOAD {filename}||{encoded}"
         hasil = send_command(command_str)
-        if hasil['status'] == 'OK':
-            print(f"Berhasil upload file: {filename}")
-            return True
-        else:
-            print(f"Gagal upload file: {hasil['data']}")
-            return False
+        print(hasil['data'])
     except Exception as e:
-        print(f"Gagal upload file: {str(e)}")
-        return False
+        print(f"Gagal upload: {str(e)}")
 
-def remote_delete(remote_filename=""):
-    command_str = f"DELETE {remote_filename}"
-    hasil = send_command(command_str)
-    if hasil and hasil['status'] == 'OK':
-        print(f"File '{remote_filename}' berhasil dihapus dari server.")
-        return True
-    else:
-        print("Gagal menghapus file:", hasil.get('data', 'Unknown error'))
-        return False
+def remote_delete(filename=""):
+    hasil = send_command(f"DELETE {filename}")
+    print(hasil['data'])
 
 if __name__ == '__main__':
-    server_address = ('172.16.16.101', 1231)
-
     remote_list()
     remote_get('donalbebek.jpg')
-    remote_upload('test_upload.jpg')
-    os.remove('test_upload.jpg')
-    print("File test_upload.jpg pada local dihapus")
-    print(os.listdir("."))
+    remote_upload('file_upload.jpg')
+    os.remove('file_upload.jpg')
+    print("File file_upload.jpg pada local dihapus")
     remote_list()
-    remote_get('test_upload.jpg')
-    remote_delete('test_upload.jpg')
+    remote_get('file_upload.jpg')
+    remote_delete('file_upload.jpg')
     remote_list()
