@@ -42,9 +42,9 @@ GET
 UPLOAD
 * TUJUAN: untuk mengirim file dari client ke server dengan isi file dalam format base64
 * PARAMETER:
-  - PARAMETER1 dan PARAMETER2 digabung dalam satu string dengan pemisah `||`
-    - sebelum `||` adalah nama file tujuan penyimpanan di server
-    - setelah `||` adalah isi file yang sudah di-encode dalam base64 (tanpa spasi)
+  - PARAMETER1 dan PARAMETER2 digabung dalam satu string dengan pemisah ||
+    - sebelum || adalah nama file tujuan penyimpanan di server
+    - setelah || adalah isi file yang sudah di-encode dalam base64 (tanpa spasi)
 * FORMAT:
   UPLOAD nama_file.ext||isi_file_base64\r\n\r\n
 * RESULT:
