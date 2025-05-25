@@ -1,13 +1,11 @@
 import os
-import json
 import base64
 from glob import glob
 
 class FileInterface:
     def __init__(self):
         self.base_dir = 'files'
-        if not os.path.exists(self.base_dir):
-            os.makedirs(self.base_dir)
+        os.makedirs(self.base_dir, exist_ok=True)
 
     def list(self, params=[]):
         try:
@@ -19,26 +17,22 @@ class FileInterface:
 
     def get(self, params=[]):
         try:
-            if not params:
-                return dict(status='ERROR', data='Parameter nama file dibutuhkan')
             filename = params[0]
+            if not filename:
+                return dict(status='ERROR', data='Filename kosong')
             filepath = os.path.join(self.base_dir, filename)
-            if not os.path.exists(filepath):
-                return dict(status='ERROR', data='File tidak ditemukan')
             with open(filepath, 'rb') as fp:
-                isifile = base64.b64encode(fp.read()).decode()
-            return dict(status='OK', data_namafile=filename, data_file=isifile)
+                content = base64.b64encode(fp.read()).decode()
+            return dict(status='OK', data_namafile=filename, data_file=content)
         except Exception as e:
             return dict(status='ERROR', data=str(e))
 
     def upload(self, params=[]):
         try:
-            if len(params) < 2:
-                return dict(status='ERROR', data='Parameter upload tidak lengkap')
             filename = params[0]
-            b64content = params[1].strip()
-            content = base64.b64decode(b64content)
+            content_base64 = params[1].strip()
             filepath = os.path.join(self.base_dir, filename)
+            content = base64.b64decode(content_base64)
             with open(filepath, 'wb') as fp:
                 fp.write(content)
             return dict(status='OK', data=f'File {filename} berhasil diupload')
@@ -47,14 +41,11 @@ class FileInterface:
 
     def delete(self, params=[]):
         try:
-            if not params:
-                return dict(status='ERROR', data='Parameter nama file dibutuhkan')
             filename = params[0]
             filepath = os.path.join(self.base_dir, filename)
             if os.path.exists(filepath):
                 os.remove(filepath)
                 return dict(status='OK', data=f'File {filename} berhasil dihapus')
-            else:
-                return dict(status='ERROR', data='File tidak ditemukan')
+            return dict(status='ERROR', data='File tidak ditemukan')
         except Exception as e:
             return dict(status='ERROR', data=str(e))
