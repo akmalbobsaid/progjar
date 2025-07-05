@@ -1,56 +1,70 @@
+from socket import *
 import socket
 import threading
 import logging
+import sys
 from file_protocol import FileProtocol
 
 fp = FileProtocol()
 
 class ProcessTheClient(threading.Thread):
     def __init__(self, connection, address):
-        super().__init__()
         self.connection = connection
         self.address = address
+        threading.Thread.__init__(self)
 
     def run(self):
-        try:
-            buffer = ""
-            while True:
-                data = self.connection.recv(1024)
+        data_received = ""
+        while True:
+            try:
+                data = self.connection.recv(4096)
                 if data:
-                    buffer += data.decode()
-                    if "\r\n\r\n" in buffer:
-                        break
+                    data_received += data.decode()
+                    if "\r\n\r\n" in data_received:
+                        command_to_process = data_received.strip()
+                        
+                        hasil = fp.proses_string(command_to_process)
+                        
+                        hasil = hasil + "\r\n\r\n"
+                        
+                        self.connection.sendall(hasil.encode())
+                        
+                        data_received = ""
                 else:
                     break
+            except Exception as e:
+                logging.warning(f"Error handling client {self.address}: {e}")
+                break
+        self.connection.close()
+        logging.warning(f"Connection with {self.address} closed")
 
-            if buffer:
-                request = buffer.strip("\r\n\r\n")
-                response = fp.proses_string(request)
-                self.connection.sendall((response + "\r\n\r\n").encode())
-        except Exception as e:
-            logging.warning(f"Error handling client {self.address}: {str(e)}")
-        finally:
-            self.connection.close()
 
 class Server(threading.Thread):
-    def __init__(self, ipaddress='0.0.0.0', port=1231):
-        super().__init__()
+    def __init__(self, ipaddress='0.0.0.0', port=8889):
         self.ipinfo = (ipaddress, port)
         self.the_clients = []
         self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        threading.Thread.__init__(self)
 
     def run(self):
-        logging.warning(f"Server berjalan di {self.ipinfo}")
+        logging.warning(f"server running on {self.ipinfo}")
         self.my_socket.bind(self.ipinfo)
-        self.my_socket.listen(5)
+        self.my_socket.listen(1)
         while True:
-            conn, addr = self.my_socket.accept()
-            logging.warning(f"Koneksi dari {addr}")
-            clt = ProcessTheClient(conn, addr)
+            self.connection, self.client_address = self.my_socket.accept()
+            logging.warning(f"connection from {self.client_address}")
+
+            clt = ProcessTheClient(self.connection, self.client_address)
             clt.start()
             self.the_clients.append(clt)
 
+
+def main():
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+    svr = Server(ipaddress='0.0.0.0', port=6666)
+    svr.start()
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
-    Server().start()
+    main()
