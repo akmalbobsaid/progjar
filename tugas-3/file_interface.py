@@ -1,75 +1,77 @@
-import socket
+import os
 import json
 import base64
 import logging
-import os
+from glob import glob
 
-server_address = ('172.16.16.101', 1231)
+class FileInterface:
+    def __init__(self):
+        if not os.path.exists('files'):
+            os.makedirs('files')
+        os.chdir('files/')
 
-def send_command(command_str=""):
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(server_address)
-        command_str += "\r\n\r\n"
-        sock.sendall(command_str.encode())
+    def list(self, params=[]):
+        try:
+            logging.warning("LIST: getting file list")
+            filelist = glob('*.*')
+            return dict(status='OK', data=filelist)
+        except Exception as e:
+            logging.error(f"LIST Error: {e}")
+            return dict(status='ERROR', data=str(e))
 
-        data_received = ""
-        while True:
-            data = sock.recv(1024)
-            if data:
-                data_received += data.decode()
-                if "\r\n\r\n" in data_received:
-                    break
+    def get(self, params=[]):
+        try:
+            filename = params[0]
+            if (filename == ''):
+                return dict(status='ERROR', data='GET error: filename must be provided')
+            
+            logging.warning(f"GET: reading file {filename}")
+            with open(f"{filename}", 'rb') as fp:
+                isifile = base64.b64encode(fp.read()).decode()
+            return dict(status='OK', data_namafile=filename, data_file=isifile)
+        except FileNotFoundError:
+            logging.error(f"GET Error: file {filename} not found")
+            return dict(status='ERROR', data=f'File {filename} not found')
+        except Exception as e:
+            logging.error(f"GET Error: {e}")
+            return dict(status='ERROR', data=str(e))
+
+    def upload(self, params=[]):
+        try:
+            if len(params) < 2:
+                return dict(status='ERROR', data='UPLOAD error: filename and file content must be provided')
+
+            filename = params[0]
+            filedata_base64 = params[1]
+            
+            filedata = base64.b64decode(filedata_base64)
+            
+            logging.warning(f"UPLOAD: writing file {filename} ({len(filedata)} bytes)")
+            with open(filename, 'wb+') as fp:
+                fp.write(filedata)
+            
+            return dict(status='OK', data_namafile=filename)
+        except IndexError:
+            return dict(status='ERROR', data="UPLOAD command requires filename and file data.")
+        except Exception as e:
+            logging.error(f"UPLOAD Error: {e}")
+            return dict(status='ERROR', data=str(e))
+
+    def delete(self, params=[]):
+        try:
+            filename = params[0]
+            if not filename:
+                 return dict(status='ERROR', data="DELETE error: Filename not provided.")
+
+            if os.path.exists(filename):
+                logging.warning(f"DELETE: removing file {filename}")
+                os.remove(filename)
+                return dict(status='OK', data_namafile=filename)
             else:
-                break
-
-        return json.loads(data_received.strip())
-    except Exception as e:
-        logging.warning(f"Error: {e}")
-        return dict(status='ERROR', data=str(e))
-    finally:
-        sock.close()
-
-def remote_list():
-    hasil = send_command("LIST")
-    if hasil['status'] == 'OK':
-        print("Daftar file:")
-        for f in hasil['data']:
-            print(f"- {f}")
-    else:
-        print(f"Gagal: {hasil['data']}")
-
-def remote_get(filename=""):
-    hasil = send_command(f"GET {filename}")
-    if hasil['status'] == 'OK':
-        with open(hasil['data_namafile'], 'wb') as f:
-            f.write(base64.b64decode(hasil['data_file']))
-        print(f"File '{filename}' berhasil di-download.")
-    else:
-        print(f"Gagal: {hasil['data']}")
-
-def remote_upload(filepath):
-    try:
-        with open(filepath, 'rb') as f:
-            encoded = base64.b64encode(f.read()).decode()
-        filename = os.path.basename(filepath)
-        command_str = f"UPLOAD {filename}||{encoded}"
-        hasil = send_command(command_str)
-        print(hasil['data'])
-    except Exception as e:
-        print(f"Gagal upload: {str(e)}")
-
-def remote_delete(filename=""):
-    hasil = send_command(f"DELETE {filename}")
-    print(hasil['data'])
-
-if __name__ == '__main__':
-    remote_list()
-    remote_get('donalbebek.jpg')
-    remote_upload('file_upload.jpg')
-    os.remove('file_upload.jpg')
-    print("File file_upload.jpg pada local dihapus")
-    remote_list()
-    remote_get('file_upload.jpg')
-    remote_delete('file_upload.jpg')
-    remote_list()
+                logging.error(f"DELETE error: file {filename} not found")
+                return dict(status='ERROR', data=f"File '{filename}' not found.")
+        except IndexError:
+            return dict(status='ERROR', data="DELETE command requires a filename.")
+        except Exception as e:
+            logging.error(f"DELETE error: {e}")
+            return dict(status='ERROR', data=str(e))
