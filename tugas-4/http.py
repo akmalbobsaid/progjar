@@ -76,7 +76,6 @@ class HttpServer:
         route = parsed.path
         query = parse_qs(parsed.query)
 
-        # /list
         if route == '/list':
             target_dir = query.get('dir', ['./'])[0]
             if not os.path.isdir(target_dir):
@@ -86,7 +85,6 @@ class HttpServer:
             body = "\n".join(files)
             return self.response(200, 'OK', body, {'Content-Type': 'text/plain'})
 
-        # /delete/filename
         if route.startswith('/delete/'):
             filename = route[len('/delete/'):]
             safe_path = os.path.abspath(filename)
@@ -99,7 +97,6 @@ class HttpServer:
             else:
                 return self.response(404, 'Not Found', 'File not found.')
 
-        # file serving
         if route == '/':
             return self.response(200, 'OK', 'Welcome to the experimental web server.', {'Content-Type': 'text/plain'})
         elif route == '/video':
